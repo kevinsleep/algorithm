@@ -24,15 +24,18 @@ MainWindow::MainWindow(QWidget *parent)
     setStatusBar(statusBar);
     statusBar->showMessage("Ready");
 
-	MazeWidget* mazeWidget = new MazeWidget(this);
+	mazeWidget = new MazeWidget(this);
 
-	ShowInfoWidget* showInfoWidget = new ShowInfoWidget(this);
+	showInfoWidget = new ShowInfoWidget(this);
 	showInfoWidget->setGeometry(10, 60, 160, 140);
 
 	row_cnt = new QSpinBox(this);
 	row_cnt->setGeometry(100, 210, 50, 20);
+	row_cnt->setMinimum(10);
 	col_cnt = new QSpinBox(this);
 	col_cnt->setGeometry(100, 240, 50, 20);
+	col_cnt->setMinimum(10);
+
 
 	QFont monospaceFont("Courier New", 10, true);
 	label_row = new QLabel("Row", this);
@@ -45,6 +48,8 @@ MainWindow::MainWindow(QWidget *parent)
 	button_generate = new QPushButton("Generate", this);
 	button_generate->setGeometry(20, 270, 120, 30);
 	button_generate->setFont(monospaceFont);
+	connect(button_generate, &QPushButton::clicked, this, &MainWindow::generateButtonClicked);
+
 	//button_generate->setStyleSheet("background-color: lightgrey");
     /*QDockWidget* dockWidget = new QDockWidget("Dockable", this);
     QLabel* dockLabel = new QLabel("This is a dockable widget", dockWidget);
@@ -55,6 +60,13 @@ MainWindow::MainWindow(QWidget *parent)
 MainWindow::~MainWindow()
 {}
 
+void MainWindow::generateButtonClicked()
+{
+	int row = row_cnt->value();
+	int column = col_cnt->value();
+	mazeWidget->generateMaze(row, column);
+}
+
 MazeWidget::MazeWidget(QWidget* parent) : QWidget(parent)
 {
 	QPalette palette = this->palette();
@@ -62,8 +74,9 @@ MazeWidget::MazeWidget(QWidget* parent) : QWidget(parent)
 	this->setAutoFillBackground(true);
 	this->setPalette(palette);
 
+	maze = new AdjacencyList(50, 50);
+
 	setGeometry(170, 60, 600, 500);
-	
 	repaint();
 }
 
@@ -74,11 +87,121 @@ void MazeWidget::paintEvent(QPaintEvent* event)
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
 
+	paintMaze(painter);
+    
+}
 
-    painter.setPen(QPen(Qt::gray,2));
-    painter.drawRect(rect().adjusted(1, 1, -1, -1));
-    
-    
+void MazeWidget::paintMaze(QPainter& painter)
+{
+	painter.setPen(QPen(Qt::black, 1));
+	QRect r = rect().adjusted(1, 1, -1, -1);
+
+	painter.drawRect(r);
+	int row = maze->getRow();
+	int column = maze->getColumn();
+
+	int cell_width = r.width() / column;
+	int cell_height = r.height() / row;
+
+	int less_pixel_x = r.width() - cell_width * column;
+	int less_pixel_y = r.height() - cell_height * row;
+
+	int start_x = 1;
+	int start_y = 1;
+
+	int temp_x = 0;
+	int temp_y = 0;
+
+	for (int i = 0; i < row; i++)
+	{
+		if (temp_y > row) {
+			start_y += 1;
+			temp_y -= row;
+		}
+
+		temp_x = 0;
+		start_x = 0;
+		for (int j = 0; j < column; j++)
+		{
+			if (temp_x > column) {
+				start_x += 1;
+				temp_x -= column;
+			}
+
+			int index = i * column + j;
+			if (!maze->isNeighbor(index, index + 1))
+			{
+				painter.drawLine(start_x + cell_width, start_y, start_x + cell_width, start_y + cell_height);
+			}
+			if (!maze->isNeighbor(index, index + column))
+			{
+				painter.drawLine(start_x, start_y + cell_height, start_x + cell_width, start_y + cell_height);
+			}
+
+			temp_x += less_pixel_x;
+			start_x += cell_width;
+		}
+
+		start_y += cell_height;
+		temp_y += less_pixel_y;
+	}
+}
+
+void MazeWidget::generateMaze(int row, int column)
+{
+	maze = new AdjacencyList(row, column);
+
+	switch ( method)
+	{
+	case Generate_method::DeepFirstSearch:
+		generateMazeByDeepFirstSearch(row, column);
+		break;
+
+	case Generate_method::Prim:
+
+		break;
+
+	case Generate_method::Kruskal:
+
+		break;
+	}
+}
+
+void MazeWidget::generateMazeByDeepFirstSearch(int row, int column)
+{
+	std::vector<int> visited(row * column, 0);
+	std::stack<int> stack;
+	stack.push(0);
+	visited[0] = 1;
+
+	while (!stack.empty())
+	{
+		int current = stack.top();
+
+		std::vector<int> surround = *maze->getSurround(current);
+		std::random_shuffle(surround.begin(), surround.end());
+
+		int i = 0;
+		for (; i < surround.size(); i++)
+		{
+			int temp = surround[i];
+			if (visited[temp] == 0)
+			{
+				maze->connect(current, temp);
+				visited[temp] = 1;
+				stack.push(temp);
+				break;
+			}
+		}
+
+		if (i == surround.size())
+		{
+			stack.pop();
+		}
+
+		repaint();
+		//update();
+	}
 }
 
 ShowInfoWidget::ShowInfoWidget(QWidget* parent) : QWidget(parent)

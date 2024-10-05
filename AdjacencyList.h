@@ -2,6 +2,7 @@
 #include <vector>
 #include <algorithm>
 #include <memory>
+#include <stdexcept>
 enum Direction
 {
 	UP = 0,
@@ -35,6 +36,8 @@ public:
 				return true;
 			}
 		}
+
+		return false;
 	}
 
 	bool isNeighbor(int i, int j)
@@ -46,6 +49,8 @@ public:
 				return true;
 			}
 		}
+
+		return false;
 	}
 
 private:

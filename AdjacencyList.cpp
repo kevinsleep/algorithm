@@ -54,6 +54,7 @@ void AdjacencyList::connect(int x, int y)
 	}
 
 	neighbor[x].push_back(y);
+	neighbor[y].push_back(x);
 }
 
 void AdjacencyList::disconnect(int x, int y)
@@ -69,6 +70,7 @@ void AdjacencyList::disconnect(int x, int y)
 	}
 
 	neighbor[x].erase(std::remove(neighbor[x].begin(), neighbor[x].end(), y), neighbor[x].end());
+	neighbor[y].erase(std::remove(neighbor[y].begin(), neighbor[y].end(), x), neighbor[y].end());
 }
 
 

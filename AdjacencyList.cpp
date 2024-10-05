@@ -38,14 +38,37 @@ AdjacencyList::AdjacencyList(int row, int column) : row(row), column(column)
 
 AdjacencyList::~AdjacencyList()
 {
+
 }
 
 void AdjacencyList::connect(int x, int y)
 {
+	if (!isSurround(x, y))
+	{
+		throw std::invalid_argument("x and y are not surround");
+	}
+
+	if (isNeighbor(x, y))
+	{
+		return;
+	}
+
+	neighbor[x].push_back(y);
 }
 
 void AdjacencyList::disconnect(int x, int y)
 {
+	if (!isSurround(x, y))
+	{
+		throw std::invalid_argument("x and y are not surround");
+	}
+
+	if (!isNeighbor(x, y))
+	{
+		return;
+	}
+
+	neighbor[x].erase(std::remove(neighbor[x].begin(), neighbor[x].end(), y), neighbor[x].end());
 }
 
 

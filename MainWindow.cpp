@@ -179,8 +179,12 @@ void MazeWidget::generateMazeByDeepFirstSearch(int row, int column)
 		int current = stack.top();
 
 		std::vector<int> surround = *maze->getSurround(current);
-		std::random_shuffle(surround.begin(), surround.end());
+		std::random_device rd;
+		std::mt19937 g(rd());
 
+		std::shuffle(surround.begin(), surround.end(), g);
+		//std::random_shuffle(surround.begin(), surround.end());
+		//c++17删除了这条特性
 		int i = 0;
 		for (; i < surround.size(); i++)
 		{

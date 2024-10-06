@@ -18,6 +18,7 @@
 #include <QStatusBar>
 #include <random>
 #include <stack>
+#include <QThread>
 #include "AdjacencyList.h"
 //#include "ui_QtWidgetsApplication1.h"
 
@@ -30,8 +31,13 @@ enum class Generate_method
 
 /*
 * MainWindow是该程序的主体窗口
+* 包含一个迷宫绘制窗口MazeWidget和一个显示信息窗口ShowInfoWidget
+* 还包含一个DrawThread线程，用于生成迷宫
 */
 
+class MazeWidget;
+class ShowInfoWidget;
+class DrawThread;
 
 
 
@@ -48,14 +54,15 @@ public:
 
     void paintEvent(QPaintEvent* event) override;
     
-	void paintMaze(QPainter& painter); //绘制迷宫的方法
-	//~MazeWidget();
-	void generateMaze(int row, int column); //生成迷宫的方法
 
-	void generateMazeByDeepFirstSearch(int row, int column);
-	//void generateMaze();
+	//下面三个方法已被废弃，其功能由DrawThread类中的方法替代
+	//void paintMaze(QPainter& painter);
 
+	//void generateMaze(int row, int column);
 
+	//void generateMazeByDeepFirstSearch(int row, int column);
+
+	QImage* image = nullptr;
 
 };
 
@@ -81,6 +88,33 @@ private:
 	QCheckBox* checkbox_show_accessed;
 };
 
+class DrawThread : public QThread
+{
+	Q_OBJECT
+public:
+	Generate_method method = Generate_method::DeepFirstSearch;
+
+	AdjacencyList* maze; //用邻接表表示迷宫间格子的连接关系
+
+	QImage paintMaze(); //绘制迷宫的方法
+	//~MazeWidget();
+
+	void generateMaze(int row, int column); //生成迷宫的方法
+
+	void generateMazeByDeepFirstSearch(int row, int column);
+	
+	void run() override;
+	bool isDrawing;
+	int row;
+	int column;
+	DrawThread(MazeWidget* mazeWidget, int row, int column, Generate_method method);
+signals:
+
+	void imageReady(const QImage &image);
+
+private:
+
+};
 
 class MainWindow : public QMainWindow
 {
@@ -90,6 +124,11 @@ public:
 	MainWindow(QWidget* parent = nullptr);
 	~MainWindow();
 
+public slots:
+	void onImageReady(const QImage& image) {
+		mazeWidget->image = new QImage(image);
+		mazeWidget->update();
+	}
 
 private:
 	//Ui::QtWidgetsApplication1Class ui;
@@ -100,6 +139,8 @@ private:
 	QPushButton* button_generate;
 	MazeWidget* mazeWidget;
 	ShowInfoWidget* showInfoWidget;
+	DrawThread* drawThread;
 
 	void generateButtonClicked();
 };
+

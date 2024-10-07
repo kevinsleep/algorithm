@@ -22,6 +22,7 @@
 #include <QImage>
 #include <string>
 #include <set>
+#include <QComboBox>
 #include "AdjacencyList.h"
 //#include "ui_QtWidgetsApplication1.h"
 
@@ -30,6 +31,14 @@ enum class Generate_method
 	DeepFirstSearch = 0,
 	Prim = 1,
 	Kruskal = 2
+};
+
+enum class FindPath_method
+{
+	DeepFirstSearch = 0,
+	BreadthFirstSearch = 1,
+	Dijkstra = 2,
+	AStar = 3
 };
 
 extern const char* generate_method_str[];
@@ -98,10 +107,14 @@ class DrawThread : public QThread
 	Q_OBJECT
 public:
 	Generate_method method = Generate_method::DeepFirstSearch;
+	FindPath_method findPathMethod = FindPath_method::DeepFirstSearch;
 
 	AdjacencyList* maze; //用邻接表表示迷宫间格子的连接关系
+	std::vector<std::pair<int, int>>* path;
+	std::vector<std::pair<int, int>>* unaccessed;
 
 	QImage paintMaze(); //绘制迷宫的方法
+	QImage paintPath(); //绘制路径的方法
 	//~MazeWidget();
 
 	void generateMaze(int row, int column); //生成迷宫的方法
@@ -110,11 +123,31 @@ public:
 	void generateMazeByPrim(int row, int column);
 	void generateMazeByKruskal(int row, int column);
 	
+	void findPath(int start, int end); //寻找路径的方法
+
+	void findPathByDeepFirstSearch(int start, int end);
+	void findPathByBreadthFirstSearch(int start, int end);
+	void findPathByDijkstra(int start, int end);
+	void findPathByAStar(int start, int end);
+
+
+
 	void run() override;
-	bool isDrawing;
+	bool isDrawing = false;
+	bool isGenerated = false;
+	bool isFindingPath = false;
+
 	int row;
 	int column;
-	DrawThread(MazeWidget* mazeWidget, int row, int column, Generate_method method);
+	QImage BaseImage;
+
+	DrawThread(
+		MazeWidget* mazeWidget, 
+		int row, int column, 
+		Generate_method method = Generate_method::DeepFirstSearch,
+		FindPath_method findPathMethod = FindPath_method::DeepFirstSearch
+	);
+
 signals:
 	void imageReady(const QImage &image);
 
@@ -139,6 +172,8 @@ public slots:
 	}
 
 	void onMethodChanged(Generate_method method);
+
+	void onComboboxFindPathMethodChanged(int index);
 	
 private:
 	//Ui::QtWidgetsApplication1Class ui;
@@ -148,10 +183,13 @@ private:
 	QLabel* label_col;
 	QLabel* label_generate_method;
 	QPushButton* button_generate;
+	QPushButton* button_findpath;
+	QComboBox* combobox_findpath_method;
 	MazeWidget* mazeWidget;
 	ShowInfoWidget* showInfoWidget;
 	DrawThread* drawThread;
 
 	void generateButtonClicked();
+	void findPathButtonClicked();
 };
 

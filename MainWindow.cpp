@@ -86,6 +86,20 @@ MainWindow::MainWindow(QWidget *parent)
 	connect(button_generate, &QPushButton::clicked, this, &MainWindow::generateButtonClicked);
 	connect(drawThread, &DrawThread::imageReady, this, &MainWindow::onImageReady);
 
+	button_findpath = new QPushButton("Find Path", this);
+	button_findpath->setGeometry(20, 400, 120, 30);
+	button_findpath->setFont(monospaceFont);
+	connect(button_findpath, &QPushButton::clicked, this, &MainWindow::findPathButtonClicked);
+
+	combobox_findpath_method = new QComboBox(this);
+	combobox_findpath_method->setGeometry(20, 440, 120, 20);
+	combobox_findpath_method->addItem("DeepFirstSearch");
+	combobox_findpath_method->addItem("BreadthFirstSearch");
+	combobox_findpath_method->addItem("Dijkstra");
+	combobox_findpath_method->addItem("AStar");
+	combobox_findpath_method->setFont(monospaceFont);
+
+
 	//button_generate->setStyleSheet("background-color: lightgrey");
     /*QDockWidget* dockWidget = new QDockWidget("Dockable", this);
     QLabel* dockLabel = new QLabel("This is a dockable widget", dockWidget);
@@ -102,7 +116,7 @@ void MainWindow::generateButtonClicked()
 	{
 		return;
 	}
-
+	drawThread->isGenerated = false;
 	drawThread->row = row_cnt->value();
 	drawThread->column = col_cnt->value();
 	drawThread->start();
@@ -381,9 +395,65 @@ QImage DrawThread::paintMaze()
 	return image;
 }
 
+QImage DrawThread::paintPath()
+{
+	QImage image = BaseImage;
+	QPainter painter(&image);
+	QRect r = image.rect().adjusted(1, 1, -1, -1);
+
+	int row = maze->getRow();
+	int column = maze->getColumn();
+
+	int cell_width = r.width() / column;
+	int cell_height = r.height() / row;
+
+	int less_pixel_x = r.width() - cell_width * column;
+	int less_pixel_y = r.height() - cell_height * row;
+
+	int start_x = cell_width / 2 + 1;
+	int start_y = cell_height / 2 + 1;
+
+	for (auto& current : *path) {
+		int rowCnt_first = current.first / column;
+		int columnCnt_first = current.first % column;
+
+		int rowCnt_second = current.second / column;
+		int columnCnt_second = current.second % column;
+
+		int x_offset = (columnCnt_first * less_pixel_x) / column;
+		int y_offset = (rowCnt_first * less_pixel_y) / row;
+
+		painter.setPen(QPen(Qt::green, 2));
+		QPoint start(start_x + columnCnt_first * cell_width + x_offset, start_y + rowCnt_first * cell_height + y_offset);
+		QPoint end(start_x + columnCnt_second * cell_width + x_offset, start_y + rowCnt_second * cell_height + y_offset);
+
+		painter.drawLine(start, end);
+	}
+
+	for (auto& current : *unaccessed) {
+		int rowCnt_first = current.first / column;
+		int columnCnt_first = current.first % column;
+
+		int rowCnt_second = current.second / column;
+		int columnCnt_second = current.second % column;
+
+		int x_offset = (columnCnt_first * less_pixel_x) / column;
+		int y_offset = (rowCnt_first * less_pixel_y) / row;
+
+		painter.setPen(QPen(Qt::red, 2));
+		QPoint start(start_x + columnCnt_first * cell_width + x_offset, start_y + rowCnt_first * cell_height + y_offset);
+		QPoint end(start_x + columnCnt_second * cell_width + x_offset, start_y + rowCnt_second * cell_height + y_offset);
+
+		painter.drawLine(start, end);
+	}
+
+	return image;
+}
+
 void DrawThread::generateMaze(int row, int column)
 {
 	maze = new AdjacencyList(row, column);
+
 
 	switch (method)
 	{
@@ -399,6 +469,9 @@ void DrawThread::generateMaze(int row, int column)
 		generateMazeByKruskal(row, column);
 		break;
 	}
+
+	isGenerated = true;
+	BaseImage = paintMaze();
 }
 
 void DrawThread::generateMazeByDeepFirstSearch(int row, int column)
@@ -538,17 +611,97 @@ void DrawThread::run()
 	}
 
 	isDrawing = true;
-	generateMaze(row, column);
 
+	if (isGenerated == false){
+		generateMaze(row, column);
+	}
+	else {
+		findPath(0, row * column - 1);
+	}
+	
 	isDrawing = false;
 
 }
 
-DrawThread::DrawThread(MazeWidget* mazeWidget, int row, int column, Generate_method method)
+DrawThread::DrawThread(MazeWidget* mazeWidget, int row, int column, Generate_method method,FindPath_method findPathMethod)
 {
 	this->method = method;
+	this->findPathMethod = findPathMethod;
 	this->row = row;
 	this->column = column;
+}
+
+void DrawThread::findPath(int start, int end)
+{
+	switch (findPathMethod)
+	{
+	case FindPath_method::DeepFirstSearch:
+		findPathByDeepFirstSearch(start, end);
+		break;
+
+	case FindPath_method::BreadthFirstSearch:
+		findPathByBreadthFirstSearch(start, end);
+		break;
+
+	case FindPath_method::Dijkstra:
+		findPathByDijkstra(start, end);
+		break;
+
+	case FindPath_method::AStar:
+		findPathByAStar(start, end);
+		break;
+	}
+}
+
+void DrawThread::findPathByDeepFirstSearch(int start, int end)
+{
+	path = new std::vector<std::pair<int, int>>();
+	unaccessed = new std::vector<std::pair<int, int>>();
+
+	std::vector<int> visited(row * column, 0);
+	path->push_back(std::make_pair(0, 0));
+
+	std::random_device rd;
+	std::mt19937 g(rd());
+
+	while (true) {
+		auto current = path->back();
+		if (current.second == end) {
+			break;
+		}
+
+		visited[current.second] = 1;
+		auto neighbor = *maze->getNeighbor(current.second);
+		std::shuffle(neighbor.begin(), neighbor.end(), g);
+		int i = 0;
+		for (; i < neighbor.size(); i++) {
+			if (visited[neighbor[i]] == 0) {
+				path->push_back(std::make_pair(current.second, neighbor[i]));
+				break;
+			}
+		}
+
+		if (i == neighbor.size()) {
+			unaccessed->push_back(path->back());
+			path->pop_back();
+		}
+
+		QImage image = paintPath();
+		emit imageReady(image);
+	}
+
+}
+
+void DrawThread::findPathByBreadthFirstSearch(int start, int end)
+{
+}
+
+void DrawThread::findPathByDijkstra(int start, int end)
+{
+}
+
+void DrawThread::findPathByAStar(int start, int end)
+{
 }
 
 void MainWindow::onMethodChanged(Generate_method method)
@@ -557,3 +710,35 @@ void MainWindow::onMethodChanged(Generate_method method)
 	label_generate_method->setText("Generation method: \n" + QString(generate_method_str[(int)method]));
 }
 
+void MainWindow::onComboboxFindPathMethodChanged(int index)
+{
+	switch (combobox_findpath_method->currentIndex())
+	{
+	case 0:
+		drawThread->findPathMethod = FindPath_method::DeepFirstSearch;
+		break;
+	case 1:
+		drawThread->findPathMethod = FindPath_method::BreadthFirstSearch;
+		break;
+	case 2:
+		drawThread->findPathMethod = FindPath_method::Dijkstra;
+		break;
+	case 3:
+		drawThread->findPathMethod = FindPath_method::AStar;
+		break;
+	default:
+		break;
+	}
+}
+
+void MainWindow::findPathButtonClicked()
+{
+	if (drawThread->isDrawing)
+	{
+		return;
+	}
+	drawThread->isFindingPath = false;
+	drawThread->row = row_cnt->value();
+	drawThread->column = col_cnt->value();
+	drawThread->start();
+}

@@ -11,6 +11,9 @@ enum Direction
 	RIGHT = 3
 };
 
+class UnionFind;
+class AdjacencyList;
+
 class AdjacencyList
 {
 public:
@@ -61,5 +64,18 @@ private:
 	std::vector<std::vector<int>> surround;
 
 
+};
+
+class UnionFind
+{
+public:
+	UnionFind(int n);
+	~UnionFind();
+
+	int find(int x);
+	void connect(int x, int y);
+	bool isConnected(int x, int y);
+private:
+	std::vector<int> parent;
 };
 

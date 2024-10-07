@@ -1,5 +1,6 @@
 #include "MainWindow.h"
 
+const char* generate_method_str[] = { "DeepFirstSearch", "Prim", "Kruskal" };
 
 
 MainWindow::MainWindow(QWidget *parent)
@@ -10,7 +11,38 @@ MainWindow::MainWindow(QWidget *parent)
     QMenuBar* menuBar = new QMenuBar(this);
     QMenu* fileMenu = menuBar->addMenu("File");
 	QMenu* GenerationMenu = menuBar->addMenu("Generation Algorithm");
+	//
 	QMenu* SolveMenu = menuBar->addMenu("Solve Algorithm");
+	QAction* DeepFirstSearchAction = GenerationMenu->addAction("DeepFirstSearch");
+	QAction* PrimAction = GenerationMenu->addAction("Prim");
+	QAction* KruskalAction = GenerationMenu->addAction("Kruskal");
+
+	connect(DeepFirstSearchAction, &QAction::triggered, this, 
+		[this] {
+			drawThread->method = Generate_method::DeepFirstSearch; 
+			emit methodChanged(Generate_method::DeepFirstSearch);
+		}
+	);
+
+	connect(PrimAction, &QAction::triggered, this, 
+		[this] {
+		drawThread->method = Generate_method::DeepFirstSearch;
+		emit methodChanged(Generate_method::Prim);
+		}
+	);
+
+	connect(KruskalAction, &QAction::triggered, this, 
+		[this] {
+			drawThread->method = Generate_method::Kruskal;
+			emit methodChanged(Generate_method::Kruskal);
+		}
+	);
+
+	label_generate_method = new QLabel("Generation Method: \n" + QString(generate_method_str[0]), this);
+	label_generate_method->setGeometry(20, 330, 150, 50);
+	
+	connect(this, &MainWindow::methodChanged, this, &MainWindow::onMethodChanged);
+
     QAction* exitAction = fileMenu->addAction("Exit");
     connect(exitAction, &QAction::triggered, this, &QMainWindow::close);
     setMenuBar(menuBar);
@@ -75,6 +107,7 @@ void MainWindow::generateButtonClicked()
 	drawThread->column = col_cnt->value();
 	drawThread->start();
 }
+
 
 MazeWidget::MazeWidget(QWidget* parent) : QWidget(parent)
 {
@@ -359,11 +392,11 @@ void DrawThread::generateMaze(int row, int column)
 		break;
 
 	case Generate_method::Prim:
-
+		generateMazeByPrim(row, column);
 		break;
 
 	case Generate_method::Kruskal:
-
+		generateMazeByKruskal(row, column);
 		break;
 	}
 }
@@ -412,6 +445,91 @@ void DrawThread::generateMazeByDeepFirstSearch(int row, int column)
 	}
 }
 
+void DrawThread::generateMazeByPrim(int row, int column)
+{
+	std::vector<bool> isConnect(row * column, false);
+	std::set<int> connectedDot;
+
+	std::random_device rd;
+	std::mt19937 g(rd());
+
+	std::uniform_int_distribution<int> dis(0, row * column - 1);
+	connectedDot.insert(0);
+
+	while (!connectedDot.empty())
+	{
+		int ramdonIndex = dis(g) % connectedDot.size();
+		auto it = connectedDot.begin();
+		std::advance(it, ramdonIndex);
+
+		int current = *it;
+
+		std::vector<int> surround = *maze->getSurround(current);
+		std::shuffle(surround.begin(), surround.end(), g);
+		int i = 0;
+		for (; i < surround.size(); i++)
+		{
+			int temp = surround[i];
+			if (!isConnect[temp])
+			{
+				maze->connect(current, temp);
+				connectedDot.insert(temp);
+				isConnect[temp] = true;
+
+				QImage image = paintMaze();
+				emit imageReady(image);
+			}
+		}
+
+		if (i = surround.size())
+		{
+			connectedDot.erase(it);
+		}
+
+	}
+	
+	
+}
+
+void DrawThread::generateMazeByKruskal(int row, int column)
+{
+	UnionFind uf(row * column);
+
+	std::random_device rd;
+	std::mt19937 g(rd());
+
+	std::vector<std::pair<int, int>> edges;
+
+	for (int i = 0; i < row * column; i++)
+	{
+		if (i % column != column - 1)
+		{
+			edges.push_back(std::make_pair(i, i + 1));
+		}
+		if (i / column != row - 1)
+		{
+			edges.push_back(std::make_pair(i, i + column));
+		}
+	}
+
+	std::shuffle(edges.begin(), edges.end(), g);
+
+	for (auto& edge : edges)
+	{
+		int x = edge.first;
+		int y = edge.second;
+
+		if (!uf.isConnected(x, y))
+		{
+			uf.connect(x, y);
+			maze->connect(x, y);
+		}
+
+		QImage image = paintMaze();
+		emit imageReady(image);
+	}
+}
+
 void DrawThread::run()
 {
 	if (isDrawing)
@@ -432,3 +550,10 @@ DrawThread::DrawThread(MazeWidget* mazeWidget, int row, int column, Generate_met
 	this->row = row;
 	this->column = column;
 }
+
+void MainWindow::onMethodChanged(Generate_method method)
+{
+	drawThread->method = method;
+	label_generate_method->setText("Generation method: \n" + QString(generate_method_str[(int)method]));
+}
+

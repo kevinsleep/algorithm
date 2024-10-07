@@ -19,15 +19,20 @@
 #include <random>
 #include <stack>
 #include <QThread>
+#include <QImage>
+#include <string>
+#include <set>
 #include "AdjacencyList.h"
 //#include "ui_QtWidgetsApplication1.h"
 
 enum class Generate_method
 {
-	DeepFirstSearch,
-	Prim,
-	Kruskal
+	DeepFirstSearch = 0,
+	Prim = 1,
+	Kruskal = 2
 };
+
+extern const char* generate_method_str[];
 
 /*
 * MainWindow是该程序的主体窗口
@@ -102,6 +107,8 @@ public:
 	void generateMaze(int row, int column); //生成迷宫的方法
 
 	void generateMazeByDeepFirstSearch(int row, int column);
+	void generateMazeByPrim(int row, int column);
+	void generateMazeByKruskal(int row, int column);
 	
 	void run() override;
 	bool isDrawing;
@@ -109,10 +116,8 @@ public:
 	int column;
 	DrawThread(MazeWidget* mazeWidget, int row, int column, Generate_method method);
 signals:
-
 	void imageReady(const QImage &image);
 
-private:
 
 };
 
@@ -124,18 +129,24 @@ public:
 	MainWindow(QWidget* parent = nullptr);
 	~MainWindow();
 
+signals:
+	void methodChanged(Generate_method method);
+
 public slots:
 	void onImageReady(const QImage& image) {
 		mazeWidget->image = new QImage(image);
 		mazeWidget->update();
 	}
 
+	void onMethodChanged(Generate_method method);
+	
 private:
 	//Ui::QtWidgetsApplication1Class ui;
 	QSpinBox* row_cnt;
 	QSpinBox* col_cnt;
 	QLabel* label_row;
 	QLabel* label_col;
+	QLabel* label_generate_method;
 	QPushButton* button_generate;
 	MazeWidget* mazeWidget;
 	ShowInfoWidget* showInfoWidget;

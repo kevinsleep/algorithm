@@ -73,4 +73,43 @@ void AdjacencyList::disconnect(int x, int y)
 	neighbor[y].erase(std::remove(neighbor[y].begin(), neighbor[y].end(), x), neighbor[y].end());
 }
 
+UnionFind::UnionFind(int n)
+{
+	parent.resize(n);
+	for (int i = 0; i < n; i++)
+	{
+		parent[i] = i;
+	}
+}
 
+UnionFind::~UnionFind()
+{
+
+}
+
+int UnionFind::find(int x)
+{
+	int root = x;
+	while (parent[root] != root)
+	{
+		root = parent[root];
+	}
+
+	return root;
+}
+
+void UnionFind::connect(int x, int y)
+{
+	int root_x = find(x);
+	int root_y = find(y);
+
+	if (root_x != root_y)
+	{
+		parent[root_x] = root_y;
+	}
+}
+
+bool UnionFind::isConnected(int x, int y)
+{
+	return find(x) == find(y);
+}

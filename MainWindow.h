@@ -22,6 +22,7 @@
 #include <QImage>
 #include <string>
 #include <set>
+#include <queue>
 #include <QComboBox>
 #include "AdjacencyList.h"
 //#include "ui_QtWidgetsApplication1.h"
@@ -76,7 +77,7 @@ public:
 
 	//void generateMazeByDeepFirstSearch(int row, int column);
 
-	QImage* image = nullptr;
+	std::shared_ptr<QImage> image = nullptr;
 
 };
 
@@ -89,6 +90,11 @@ public:
 
 	void paintEvent(QPaintEvent* event) override;
 
+	QCheckBox* checkbox_show_wall;
+	QCheckBox* checkbox_show_path;
+	QCheckBox* checkbox_show_solution;
+	QCheckBox* checkbox_show_accessed;
+
 private:
 	QLabel* label_show;
 	QLabel* label_wall;
@@ -96,10 +102,6 @@ private:
 	QLabel* label_solution;
 	QLabel* label_accessed;
 
-	QCheckBox* checkbox_show_wall;
-	QCheckBox* checkbox_show_path;
-	QCheckBox* checkbox_show_solution;
-	QCheckBox* checkbox_show_accessed;
 };
 
 class DrawThread : public QThread
@@ -137,6 +139,9 @@ public:
 	bool isGenerated = false;
 	bool isFindingPath = false;
 
+	bool showWall = true;
+	bool showPath = false;
+	bool showSolution = true;
 	int row;
 	int column;
 	QImage BaseImage;
@@ -167,8 +172,9 @@ signals:
 
 public slots:
 	void onImageReady(const QImage& image) {
-		mazeWidget->image = new QImage(image);
+		mazeWidget->image = std::shared_ptr<QImage>(new QImage(image));
 		mazeWidget->update();
+		
 	}
 
 	void onMethodChanged(Generate_method method);

@@ -63,6 +63,8 @@ MainWindow::MainWindow(QWidget *parent)
 	showInfoWidget = new ShowInfoWidget(this);
 	showInfoWidget->setGeometry(10, 60, 160, 140);
 
+	
+
 	row_cnt = new QSpinBox(this);
 	row_cnt->setGeometry(100, 210, 50, 20);
 	row_cnt->setMinimum(10);
@@ -98,7 +100,24 @@ MainWindow::MainWindow(QWidget *parent)
 	combobox_findpath_method->addItem("Dijkstra");
 	combobox_findpath_method->addItem("AStar");
 	combobox_findpath_method->setFont(monospaceFont);
+	connect(combobox_findpath_method, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::onComboboxFindPathMethodChanged);
 
+	connect(showInfoWidget->checkbox_show_wall, &QCheckBox::stateChanged, this, [&]() {
+		drawThread->showWall = !drawThread->showWall;
+		drawThread->BaseImage = drawThread->paintMaze();
+		emit drawThread->imageReady(drawThread->paintPath());
+		
+		});
+	connect(showInfoWidget->checkbox_show_path, &QCheckBox::stateChanged, this, [&]() {
+		drawThread->showPath = !drawThread->showPath;
+		drawThread->BaseImage = drawThread->paintMaze();
+		emit drawThread->imageReady(drawThread->paintPath());
+		});
+	connect(showInfoWidget->checkbox_show_solution, &QCheckBox::stateChanged, this, [&]() {
+		drawThread->showSolution = !drawThread->showSolution;
+		drawThread->BaseImage = drawThread->paintMaze();
+		emit drawThread->imageReady(drawThread->paintPath());
+		});
 
 	//button_generate->setStyleSheet("background-color: lightgrey");
     /*QDockWidget* dockWidget = new QDockWidget("Dockable", this);
@@ -299,7 +318,7 @@ ShowInfoWidget::ShowInfoWidget(QWidget* parent) : QWidget(parent)
 	int checkbox_width = 20;
 	int checkbox_height = 20;
 
-    auto setCheckBox = [&](QCheckBox* checkbox, const QString& text) {
+    auto setCheckBox = [&](QCheckBox* &checkbox, const QString& text) {
 		checkbox = new QCheckBox(text,this);
 		checkbox->setGeometry(20, 20 + checkbox_y_offset * checkbox_cnt, checkbox_width, checkbox_height);
 		checkbox_cnt++;
@@ -310,8 +329,11 @@ ShowInfoWidget::ShowInfoWidget(QWidget* parent) : QWidget(parent)
 		};
 
 	setCheckBox(checkbox_show_wall, "Wall");
+	checkbox_show_wall->setChecked(true);
 	setCheckBox(checkbox_show_path, "Path");
+	checkbox_show_path->setChecked(false);
 	setCheckBox(checkbox_show_solution, "Solution");
+	checkbox_show_solution->setChecked(true);
 	setCheckBox(checkbox_show_accessed, "Accessed");
 
 }
@@ -337,11 +359,18 @@ void ShowInfoWidget::paintEvent(QPaintEvent* event)
 
 QImage DrawThread::paintMaze()
 {
+
+
+
 	QImage image(600, 500, QImage::Format_RGB32);
 	QPainter painter(&image);
 	painter.fillRect(image.rect(), Qt::white);
 	painter.setPen(QPen(Qt::black, 1));
 	QRect r = image.rect().adjusted(1, 1, -1, -1);
+
+	if (showWall == false) {
+		return image;
+	}
 
 	int row = maze->getRow();
 	int column = maze->getColumn();
@@ -401,6 +430,10 @@ QImage DrawThread::paintPath()
 	QPainter painter(&image);
 	QRect r = image.rect().adjusted(1, 1, -1, -1);
 
+	if (showSolution == false) {
+		return image;
+	}
+
 	int row = maze->getRow();
 	int column = maze->getColumn();
 
@@ -441,6 +474,7 @@ QImage DrawThread::paintPath()
 		int y_offset = (rowCnt_first * less_pixel_y) / row;
 
 		painter.setPen(QPen(Qt::red, 2));
+		
 		QPoint start(start_x + columnCnt_first * cell_width + x_offset, start_y + rowCnt_first * cell_height + y_offset);
 		QPoint end(start_x + columnCnt_second * cell_width + x_offset, start_y + rowCnt_second * cell_height + y_offset);
 
@@ -627,6 +661,9 @@ DrawThread::DrawThread(MazeWidget* mazeWidget, int row, int column, Generate_met
 {
 	this->method = method;
 	this->findPathMethod = findPathMethod;
+	
+	this->path = new std::vector<std::pair<int, int>>();
+	this->unaccessed = new std::vector<std::pair<int, int>>();
 	this->row = row;
 	this->column = column;
 }
@@ -694,6 +731,73 @@ void DrawThread::findPathByDeepFirstSearch(int start, int end)
 
 void DrawThread::findPathByBreadthFirstSearch(int start, int end)
 {
+	path = new std::vector<std::pair<int, int>>();
+	unaccessed = new std::vector<std::pair<int, int>>();
+	int currentVisitPathIndex = 0;
+
+	std::vector<int> visited(row * column, 0);
+	std::vector<int> isUnaccessed(row * column, 0);
+	std::vector<int> parent(row * column, -1);
+	path->push_back(std::make_pair(0, 0));
+
+	std::random_device rd;
+	std::mt19937 g(rd());
+
+	while (true) {
+		if (currentVisitPathIndex == path->size()) {
+			break;
+		}
+
+		auto current = path->at(currentVisitPathIndex);
+
+		if (current.second == end) {
+			currentVisitPathIndex++;
+			continue;
+		}
+
+		visited[current.second] = 1;
+		auto neighbor = *maze->getNeighbor(current.second);
+		std::shuffle(neighbor.begin(), neighbor.end(), g);
+		int i = 0;
+		bool unaccessedFlag = true;
+		for (; i < neighbor.size(); i++) {
+			if (visited[neighbor[i]] == 0) {
+				if (isUnaccessed[neighbor[i]] == 0)
+					unaccessedFlag = false;
+				parent[neighbor[i]] = current.second;
+				path->push_back(std::make_pair(current.second, neighbor[i]));
+			}
+		}
+
+		int index = current.second;
+		while (unaccessedFlag)
+		{
+			if (parent[index] == end || parent[index] == 0) {
+				break;
+			}
+			unaccessed->push_back(std::make_pair(parent[index], index));
+			isUnaccessed[index] = 1;
+			index = parent[index];
+			auto neighbors = *maze->getNeighbor(index);
+			for (auto& item : neighbors)
+			{
+				if (item == parent[index])
+				{
+					continue;
+				}
+
+				if (isUnaccessed[item] == 0)
+				{
+					unaccessedFlag = false;
+					break;
+				}
+			}
+		}
+
+		currentVisitPathIndex++;
+		QImage image = paintPath();
+		emit imageReady(image);
+	}
 }
 
 void DrawThread::findPathByDijkstra(int start, int end)

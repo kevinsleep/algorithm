@@ -368,57 +368,98 @@ QImage DrawThread::paintMaze()
 	painter.setPen(QPen(Qt::black, 1));
 	QRect r = image.rect().adjusted(1, 1, -1, -1);
 
-	if (showWall == false) {
-		return image;
+	if (showWall == true) {
+
+		int row = maze->getRow();
+		int column = maze->getColumn();
+
+		int cell_width = r.width() / column;
+		int cell_height = r.height() / row;
+
+		int less_pixel_x = r.width() - cell_width * column;
+		int less_pixel_y = r.height() - cell_height * row;
+
+		int start_x = 1;
+		int start_y = 1;
+
+		int temp_x = 0;
+		int temp_y = 0;
+
+		for (int i = 0; i < row; i++)
+		{
+			if (temp_y > row) {
+				start_y += 1;
+				temp_y -= row;
+			}
+
+			temp_x = 0;
+			start_x = 0;
+			for (int j = 0; j < column; j++)
+			{
+				if (temp_x > column) {
+					start_x += 1;
+					temp_x -= column;
+				}
+
+				int index = i * column + j;
+				if (!maze->isNeighbor(index, index + 1))
+				{
+					painter.drawLine(start_x + cell_width, start_y, start_x + cell_width, start_y + cell_height);
+				}
+				if (!maze->isNeighbor(index, index + column))
+				{
+					painter.drawLine(start_x, start_y + cell_height, start_x + cell_width, start_y + cell_height);
+				}
+
+				temp_x += less_pixel_x;
+				start_x += cell_width;
+			}
+
+			start_y += cell_height;
+			temp_y += less_pixel_y;
+		}
 	}
 
-	int row = maze->getRow();
-	int column = maze->getColumn();
+	if (showPath == true) {
+		int row = maze->getRow();
+		int column = maze->getColumn();
 
-	int cell_width = r.width() / column;
-	int cell_height = r.height() / row;
+		int cell_width = r.width() / column;
+		int cell_height = r.height() / row;
 
-	int less_pixel_x = r.width() - cell_width * column;
-	int less_pixel_y = r.height() - cell_height * row;
+		int less_pixel_x = r.width() - cell_width * column;
+		int less_pixel_y = r.height() - cell_height * row;
 
-	int start_x = 1;
-	int start_y = 1;
+		int start_x = cell_width / 2 + 1;
+		int start_y = cell_height / 2 + 1;
 
-	int temp_x = 0;
-	int temp_y = 0;
+		for (int i = 0; i < row; i++) {
+			for (int j = 0; j < column; j++) {
+				int index = i * column + j;
+				std::vector<int> neighbor = *maze->getNeighbor(index);
+				for (auto& i : neighbor) {
+					int rowCnt_first = index / column;
+					int columnCnt_first = index % column;
 
-	for (int i = 0; i < row; i++)
-	{
-		if (temp_y > row) {
-			start_y += 1;
-			temp_y -= row;
+					int rowCnt_second = i / column;
+					int columnCnt_second = i % column;
+
+					int x_offset = (columnCnt_first * less_pixel_x) / column;
+					int y_offset = (rowCnt_first * less_pixel_y) / row;
+
+					painter.setPen(QPen(Qt::black, 2));
+					
+					QPoint start(start_x + columnCnt_first * cell_width + x_offset, start_y + rowCnt_first * cell_height + y_offset);
+					QPoint end(start_x + columnCnt_second * cell_width + x_offset, start_y + rowCnt_second * cell_height + y_offset);
+
+					painter.drawEllipse(start, 2, 2);
+					painter.drawEllipse(end, 2, 2);
+					painter.drawLine(start, end);
+				}
+			}
 		}
 
-		temp_x = 0;
-		start_x = 0;
-		for (int j = 0; j < column; j++)
-		{
-			if (temp_x > column) {
-				start_x += 1;
-				temp_x -= column;
-			}
 
-			int index = i * column + j;
-			if (!maze->isNeighbor(index, index + 1))
-			{
-				painter.drawLine(start_x + cell_width, start_y, start_x + cell_width, start_y + cell_height);
-			}
-			if (!maze->isNeighbor(index, index + column))
-			{
-				painter.drawLine(start_x, start_y + cell_height, start_x + cell_width, start_y + cell_height);
-			}
-
-			temp_x += less_pixel_x;
-			start_x += cell_width;
-		}
-
-		start_y += cell_height;
-		temp_y += less_pixel_y;
 	}
 
 	return image;
@@ -661,7 +702,7 @@ DrawThread::DrawThread(MazeWidget* mazeWidget, int row, int column, Generate_met
 {
 	this->method = method;
 	this->findPathMethod = findPathMethod;
-	
+	this->maze = new AdjacencyList(row, column);
 	this->path = new std::vector<std::pair<int, int>>();
 	this->unaccessed = new std::vector<std::pair<int, int>>();
 	this->row = row;

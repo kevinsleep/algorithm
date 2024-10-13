@@ -7,7 +7,7 @@ MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
 {
     //ui.setupUi(this);
-
+	//ui文件界面设计
     QMenuBar* menuBar = new QMenuBar(this);
     QMenu* fileMenu = menuBar->addMenu("File");
 	QMenu* GenerationMenu = menuBar->addMenu("Generation Algorithm");
@@ -16,31 +16,31 @@ MainWindow::MainWindow(QWidget *parent)
 	QAction* DeepFirstSearchAction = GenerationMenu->addAction("DeepFirstSearch");
 	QAction* PrimAction = GenerationMenu->addAction("Prim");
 	QAction* KruskalAction = GenerationMenu->addAction("Kruskal");
-
+	//当深度优先搜索动作被触发时，设置绘制线程的生成方法，并发出一个信号
 	connect(DeepFirstSearchAction, &QAction::triggered, this, 
 		[this] {
 			drawThread->method = Generate_method::DeepFirstSearch; 
 			emit methodChanged(Generate_method::DeepFirstSearch);
 		}
 	);
-
+	//当普里姆算法动作被触发时，设置绘制线程的生成方法，并发出一个信号
 	connect(PrimAction, &QAction::triggered, this, 
 		[this] {
 		drawThread->method = Generate_method::DeepFirstSearch;
 		emit methodChanged(Generate_method::Prim);
 		}
 	);
-
+	//当克鲁斯卡尔算法动作被触发时，设置绘制线程的生成方法，并发出一个信号
 	connect(KruskalAction, &QAction::triggered, this, 
 		[this] {
 			drawThread->method = Generate_method::Kruskal;
 			emit methodChanged(Generate_method::Kruskal);
 		}
 	);
-
+	//设置生成方法标签的位置和大小
 	label_generate_method = new QLabel("Generation Method: \n" + QString(generate_method_str[0]), this);
 	label_generate_method->setGeometry(20, 330, 150, 50);
-	
+	//连接methodChanged信号到onMethodChanged槽函数
 	connect(this, &MainWindow::methodChanged, this, &MainWindow::onMethodChanged);
 
     QAction* exitAction = fileMenu->addAction("Exit");
@@ -55,25 +55,25 @@ MainWindow::MainWindow(QWidget *parent)
     QStatusBar* statusBar = new QStatusBar(this);
     setStatusBar(statusBar);
     statusBar->showMessage("Ready");
-
+	//创建一个新的MazeWidget对象，用于显示迷宫
 	mazeWidget = new MazeWidget(this);
 
 	
-
+	//创建一个新的ShowInfoWidget对象，用于显示额外的信息，并设置其位置和大小
 	showInfoWidget = new ShowInfoWidget(this);
 	showInfoWidget->setGeometry(10, 60, 160, 140);
 
 	
-
+	//创建两个新的QSpinBox控件，用于设置迷宫的行，列数，并设置其位置、大小和最小值
 	row_cnt = new QSpinBox(this);
 	row_cnt->setGeometry(100, 210, 50, 20);
 	row_cnt->setMinimum(10);
 	col_cnt = new QSpinBox(this);
 	col_cnt->setGeometry(100, 240, 50, 20);
 	col_cnt->setMinimum(10);
-
+	//创建一个新的DrawThread对象，用于在后台线程中生成和求解迷宫
 	drawThread = new DrawThread(mazeWidget, row_cnt->value(), col_cnt->value(), Generate_method::DeepFirstSearch);
-
+	//显示“行”，“列”信息，并设置字体和位置
 	QFont monospaceFont("Courier New", 10, true);
 	label_row = new QLabel("Row", this);
 	label_row->setGeometry(20, 210, 50, 20);
@@ -81,18 +81,18 @@ MainWindow::MainWindow(QWidget *parent)
 	label_col = new QLabel("Column", this);
 	label_col->setGeometry(20, 240, 50, 20);
 	label_col->setFont(monospaceFont);
-
+	//创建一个新的按钮，用于生成迷宫 
 	button_generate = new QPushButton("Generate", this);
 	button_generate->setGeometry(20, 270, 120, 30);
 	button_generate->setFont(monospaceFont);
 	connect(button_generate, &QPushButton::clicked, this, &MainWindow::generateButtonClicked);
 	connect(drawThread, &DrawThread::imageReady, this, &MainWindow::onImageReady);
-
+	//创建一个新的按钮，用于寻找路径
 	button_findpath = new QPushButton("Find Path", this);
 	button_findpath->setGeometry(20, 400, 120, 30);
 	button_findpath->setFont(monospaceFont);
 	connect(button_findpath, &QPushButton::clicked, this, &MainWindow::findPathButtonClicked);
-
+	//创建一个新的下拉框，用于选择寻找路径的算法
 	combobox_findpath_method = new QComboBox(this);
 	combobox_findpath_method->setGeometry(20, 440, 120, 20);
 	combobox_findpath_method->addItem("DeepFirstSearch");
@@ -101,18 +101,20 @@ MainWindow::MainWindow(QWidget *parent)
 	combobox_findpath_method->addItem("AStar");
 	combobox_findpath_method->setFont(monospaceFont);
 	connect(combobox_findpath_method, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::onComboboxFindPathMethodChanged);
-
+	//连接显示墙壁复选框的状态改变事件，当状态改变时，更新绘制线程的显示墙壁标志，并重新绘制迷宫和路径
 	connect(showInfoWidget->checkbox_show_wall, &QCheckBox::stateChanged, this, [&]() {
 		drawThread->showWall = !drawThread->showWall;
 		drawThread->BaseImage = drawThread->paintMaze();
 		emit drawThread->imageReady(drawThread->paintPath());
 		
 		});
+	//连接显示路径复选框的状态改变事件，当状态改变时，更新绘制线程的显示路径标志，并重新绘制迷宫和路径
 	connect(showInfoWidget->checkbox_show_path, &QCheckBox::stateChanged, this, [&]() {
 		drawThread->showPath = !drawThread->showPath;
 		drawThread->BaseImage = drawThread->paintMaze();
 		emit drawThread->imageReady(drawThread->paintPath());
 		});
+	//连接显示解决方案复选框的状态改变事件，当状态改变时，更新绘制线程的显示解决方案标志，并重新绘制迷宫和路径
 	connect(showInfoWidget->checkbox_show_solution, &QCheckBox::stateChanged, this, [&]() {
 		drawThread->showSolution = !drawThread->showSolution;
 		drawThread->BaseImage = drawThread->paintMaze();
@@ -128,7 +130,7 @@ MainWindow::MainWindow(QWidget *parent)
 
 MainWindow::~MainWindow()
 {}
-
+//当生成按钮被点击时，如果绘制线程不在绘制中，则设置迷宫的行数和列数，并启动绘制线程
 void MainWindow::generateButtonClicked()
 {
 	if (drawThread->isDrawing)
@@ -141,7 +143,7 @@ void MainWindow::generateButtonClicked()
 	drawThread->start();
 }
 
-
+//它初始化了一个QWidget对象，设置背景颜色为白色，并创建一个新的迷宫邻接表对象。然后设置窗口的大小并请求重绘
 MazeWidget::MazeWidget(QWidget* parent) : QWidget(parent)
 {
 	QPalette palette = this->palette();
@@ -155,7 +157,7 @@ MazeWidget::MazeWidget(QWidget* parent) : QWidget(parent)
 	repaint();
 }
 
-
+//在窗口需要重绘时被调用。它使用QPainter对象来绘制图像
 void MazeWidget::paintEvent(QPaintEvent* event)
 {
     
@@ -168,7 +170,7 @@ void MazeWidget::paintEvent(QPaintEvent* event)
 	}
     
 }
-
+//手动绘制迷宫
 //void MazeWidget::paintMaze(QPainter& painter)
 //{
 //	painter.setPen(QPen(Qt::black, 1));
@@ -283,7 +285,7 @@ void MazeWidget::paintEvent(QPaintEvent* event)
 //		//update();
 //	}
 //}
-
+//初始化了一个QWidget对象，并设置了显示信息的UI元素
 ShowInfoWidget::ShowInfoWidget(QWidget* parent) : QWidget(parent)
 {
 	
@@ -337,7 +339,7 @@ ShowInfoWidget::ShowInfoWidget(QWidget* parent) : QWidget(parent)
 	setCheckBox(checkbox_show_accessed, "Accessed");
 
 }
-
+//在窗口需要重绘时被调用。它使用QPainter对象来绘制窗口的边框
 void ShowInfoWidget::paintEvent(QPaintEvent* event)
 {
     QPainter painter(this);
@@ -356,7 +358,7 @@ void ShowInfoWidget::paintEvent(QPaintEvent* event)
 }
 
 
-
+//用于绘制迷宫，并返回一个QImage对象
 QImage DrawThread::paintMaze()
 {
 
@@ -464,7 +466,7 @@ QImage DrawThread::paintMaze()
 
 	return image;
 }
-
+//用于绘制路径，并返回一个QImage对象
 QImage DrawThread::paintPath()
 {
 	QImage image = BaseImage;
@@ -524,7 +526,7 @@ QImage DrawThread::paintPath()
 
 	return image;
 }
-
+//用于生成迷宫
 void DrawThread::generateMaze(int row, int column)
 {
 	maze = new AdjacencyList(row, column);
@@ -548,7 +550,7 @@ void DrawThread::generateMaze(int row, int column)
 	isGenerated = true;
 	BaseImage = paintMaze();
 }
-
+//用于通过深度优先搜索算法生成迷宫
 void DrawThread::generateMazeByDeepFirstSearch(int row, int column)
 {
 	std::vector<int> visited(row * column, 0);
@@ -592,7 +594,7 @@ void DrawThread::generateMazeByDeepFirstSearch(int row, int column)
 		//update();
 	}
 }
-
+//使用普里姆（Prim）算法生成迷宫
 void DrawThread::generateMazeByPrim(int row, int column)
 {
 	std::vector<bool> isConnect(row * column, false);
@@ -638,7 +640,7 @@ void DrawThread::generateMazeByPrim(int row, int column)
 	
 	
 }
-
+//使用克鲁斯卡尔（Kruskal）算法生成迷宫
 void DrawThread::generateMazeByKruskal(int row, int column)
 {
 	UnionFind uf(row * column);
@@ -677,7 +679,7 @@ void DrawThread::generateMazeByKruskal(int row, int column)
 		emit imageReady(image);
 	}
 }
-
+//线程的运行函数，负责生成迷宫或寻找路径
 void DrawThread::run()
 {
 	if (isDrawing)
@@ -697,7 +699,7 @@ void DrawThread::run()
 	isDrawing = false;
 
 }
-
+//构造函数初始化迷宫、路径和未访问的点，并设置生成和寻找路径的方法
 DrawThread::DrawThread(MazeWidget* mazeWidget, int row, int column, Generate_method method,FindPath_method findPathMethod)
 {
 	this->method = method;
@@ -708,7 +710,7 @@ DrawThread::DrawThread(MazeWidget* mazeWidget, int row, int column, Generate_met
 	this->row = row;
 	this->column = column;
 }
-
+//根据选择的算法，调用相应的函数来寻找路径
 void DrawThread::findPath(int start, int end)
 {
 	switch (findPathMethod)
@@ -730,7 +732,7 @@ void DrawThread::findPath(int start, int end)
 		break;
 	}
 }
-
+//使用深度优先搜索算法寻找路径
 void DrawThread::findPathByDeepFirstSearch(int start, int end)
 {
 	path = new std::vector<std::pair<int, int>>();
@@ -769,7 +771,7 @@ void DrawThread::findPathByDeepFirstSearch(int start, int end)
 	}
 
 }
-
+//使用广度优先搜索算法寻找路径
 void DrawThread::findPathByBreadthFirstSearch(int start, int end)
 {
 	path = new std::vector<std::pair<int, int>>();
@@ -840,21 +842,21 @@ void DrawThread::findPathByBreadthFirstSearch(int start, int end)
 		emit imageReady(image);
 	}
 }
-
+//使用迪杰斯特拉（Dijkstra）算法寻找路径
 void DrawThread::findPathByDijkstra(int start, int end)
 {
 }
-
+//使用A*算法寻找路径
 void DrawThread::findPathByAStar(int start, int end)
 {
 }
-
+//当生成方法改变时，更新绘制线程的方法并更新UI
 void MainWindow::onMethodChanged(Generate_method method)
 {
 	drawThread->method = method;
 	label_generate_method->setText("Generation method: \n" + QString(generate_method_str[(int)method]));
 }
-
+//当选择的寻找路径方法改变时，更新绘制线程的寻找路径方法
 void MainWindow::onComboboxFindPathMethodChanged(int index)
 {
 	switch (combobox_findpath_method->currentIndex())
@@ -875,7 +877,7 @@ void MainWindow::onComboboxFindPathMethodChanged(int index)
 		break;
 	}
 }
-
+//当点击寻找路径按钮时，如果线程不在绘制中，则开始寻找路径
 void MainWindow::findPathButtonClicked()
 {
 	if (drawThread->isDrawing)

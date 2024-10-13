@@ -72,7 +72,7 @@ void AdjacencyList::disconnect(int x, int y)
 	neighbor[x].erase(std::remove(neighbor[x].begin(), neighbor[x].end(), y), neighbor[x].end());
 	neighbor[y].erase(std::remove(neighbor[y].begin(), neighbor[y].end(), x), neighbor[y].end());
 }
-
+//²¢²é¼¯
 UnionFind::UnionFind(int n)
 {
 	parent.resize(n);

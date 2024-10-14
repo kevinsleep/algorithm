@@ -67,10 +67,12 @@ MainWindow::MainWindow(QWidget *parent)
 
 	row_cnt = new QSpinBox(this);
 	row_cnt->setGeometry(100, 210, 50, 20);
-	row_cnt->setMinimum(10);
+	row_cnt->setMinimum(3);
+	row_cnt->setValue(30);
 	col_cnt = new QSpinBox(this);
 	col_cnt->setGeometry(100, 240, 50, 20);
-	col_cnt->setMinimum(10);
+	col_cnt->setMinimum(3);
+	col_cnt->setValue(30);
 
 	drawThread = new DrawThread(mazeWidget, row_cnt->value(), col_cnt->value(), Generate_method::DeepFirstSearch);
 
@@ -92,6 +94,16 @@ MainWindow::MainWindow(QWidget *parent)
 	button_findpath->setGeometry(20, 400, 120, 30);
 	button_findpath->setFont(monospaceFont);
 	connect(button_findpath, &QPushButton::clicked, this, &MainWindow::findPathButtonClicked);
+
+	button_stop = new QPushButton("Stop", this);
+	button_stop->setGeometry(20, 310, 50, 30);
+	//button_stop->setFont(monospaceFont);
+	connect(button_stop, &QPushButton::clicked, drawThread, &DrawThread::pause);
+
+	button_continue = new QPushButton("Continue", this);
+	button_continue->setGeometry(80, 310, 60, 30);
+	//button_continue->setFont(monospaceFont);
+	connect(button_continue, &QPushButton::clicked, drawThread, &DrawThread::resume);
 
 	combobox_findpath_method = new QComboBox(this);
 	combobox_findpath_method->setGeometry(20, 440, 120, 20);
@@ -119,6 +131,24 @@ MainWindow::MainWindow(QWidget *parent)
 		emit drawThread->imageReady(drawThread->paintPath());
 		});
 
+	label_visited_cnt = new QLabel("Visited Count: \n0", this);
+	label_visited_cnt->setGeometry(20, 470, 120, 20);
+	label_visited_cnt->setFont(monospaceFont);
+	label_visited_cnt->adjustSize();
+	connect(drawThread, &DrawThread::visitedCntChanged, this, &MainWindow::onVisitedCntChanged);
+
+	label_path_cnt = new QLabel("Path Count: \n0", this);
+	label_path_cnt->setGeometry(20, 510, 120, 20);
+	label_path_cnt->setFont(monospaceFont);
+	label_path_cnt->adjustSize();
+	connect(drawThread, &DrawThread::visitedCntChanged, this, &MainWindow::onVisitedCntChanged);
+	/*connect(showInfoWidget->checkbox_show_accessed, &QCheckBox::stateChanged, this, [&]() {
+		drawThread->showAccessed = !drawThread->showAccessed;
+		drawThread->BaseImage = drawThread->paintMaze();
+		emit drawThread->imageReady(drawThread->paintPath());
+		});*/
+
+
 	//button_generate->setStyleSheet("background-color: lightgrey");
     /*QDockWidget* dockWidget = new QDockWidget("Dockable", this);
     QLabel* dockLabel = new QLabel("This is a dockable widget", dockWidget);
@@ -128,6 +158,8 @@ MainWindow::MainWindow(QWidget *parent)
 
 MainWindow::~MainWindow()
 {}
+
+
 
 void MainWindow::generateButtonClicked()
 {
@@ -504,6 +536,7 @@ QImage DrawThread::paintPath()
 		painter.drawLine(start, end);
 	}
 
+	//if (showAccessed)
 	for (auto& current : *unaccessed) {
 		int rowCnt_first = current.first / column;
 		int columnCnt_first = current.first % column;
@@ -519,7 +552,17 @@ QImage DrawThread::paintPath()
 		QPoint start(start_x + columnCnt_first * cell_width + x_offset, start_y + rowCnt_first * cell_height + y_offset);
 		QPoint end(start_x + columnCnt_second * cell_width + x_offset, start_y + rowCnt_second * cell_height + y_offset);
 
-		painter.drawLine(start, end);
+		if (findPathMethod == FindPath_method::BreadthFirstSearch)
+		{
+			painter.setPen(QPen(Qt::white, 2));
+			painter.drawLine(start, end);
+		}
+		/*else
+		{
+			painter.drawLine(start, end);
+		}*/
+
+		
 	}
 
 	return image;
@@ -561,7 +604,17 @@ void DrawThread::generateMazeByDeepFirstSearch(int row, int column)
 
 	while (!stack.empty())
 	{
+		{
+			QMutexLocker locker(&mutex);
+			if (isPaused)
+			{
+				condition.wait(&mutex);
+			}
+		}
+
+
 		int current = stack.top();
+		bool isChanged = false;
 
 		std::vector<int> surround = *maze->getSurround(current);
 
@@ -575,6 +628,7 @@ void DrawThread::generateMazeByDeepFirstSearch(int row, int column)
 			int temp = surround[i];
 			if (visited[temp] == 0)
 			{
+				isChanged = true;
 				maze->connect(current, temp);
 				visited[temp] = 1;
 				stack.push(temp);
@@ -587,8 +641,10 @@ void DrawThread::generateMazeByDeepFirstSearch(int row, int column)
 			stack.pop();
 		}
 
-		QImage image = paintMaze();
-		emit imageReady(image);
+		if (isChanged) {
+			QImage image = paintMaze();
+			emit imageReady(image);
+		}
 		//update();
 	}
 }
@@ -606,6 +662,13 @@ void DrawThread::generateMazeByPrim(int row, int column)
 
 	while (!connectedDot.empty())
 	{
+		{
+			QMutexLocker locker(&mutex);
+			if (isPaused)
+			{
+				condition.wait(&mutex);
+			}
+		}
 		int ramdonIndex = dis(g) % connectedDot.size();
 		auto it = connectedDot.begin();
 		std::advance(it, ramdonIndex);
@@ -664,6 +727,13 @@ void DrawThread::generateMazeByKruskal(int row, int column)
 
 	for (auto& edge : edges)
 	{
+		{
+			QMutexLocker locker(&mutex);
+			if (isPaused)
+			{
+				condition.wait(&mutex);
+			}
+		}
 		int x = edge.first;
 		int y = edge.second;
 
@@ -671,10 +741,11 @@ void DrawThread::generateMazeByKruskal(int row, int column)
 		{
 			uf.connect(x, y);
 			maze->connect(x, y);
+			QImage image = paintMaze();
+			emit imageReady(image);
 		}
 
-		QImage image = paintMaze();
-		emit imageReady(image);
+		
 	}
 }
 
@@ -711,6 +782,8 @@ DrawThread::DrawThread(MazeWidget* mazeWidget, int row, int column, Generate_met
 
 void DrawThread::findPath(int start, int end)
 {
+	visitedCnt = 0;
+	pathCnt = 0;
 	switch (findPathMethod)
 	{
 	case FindPath_method::DeepFirstSearch:
@@ -729,6 +802,7 @@ void DrawThread::findPath(int start, int end)
 		findPathByAStar(start, end);
 		break;
 	}
+	emit visitedCntChanged(visitedCnt, pathCnt);
 }
 
 void DrawThread::findPathByDeepFirstSearch(int start, int end)
@@ -743,7 +817,16 @@ void DrawThread::findPathByDeepFirstSearch(int start, int end)
 	std::mt19937 g(rd());
 
 	while (true) {
+		{
+			QMutexLocker locker(&mutex);
+			if (isPaused)
+			{
+				condition.wait(&mutex);
+			}
+		}
+
 		auto current = path->back();
+		//visitedCnt++;
 		if (current.second == end) {
 			break;
 		}
@@ -755,6 +838,7 @@ void DrawThread::findPathByDeepFirstSearch(int start, int end)
 		for (; i < neighbor.size(); i++) {
 			if (visited[neighbor[i]] == 0) {
 				path->push_back(std::make_pair(current.second, neighbor[i]));
+				pathCnt++;
 				break;
 			}
 		}
@@ -762,12 +846,23 @@ void DrawThread::findPathByDeepFirstSearch(int start, int end)
 		if (i == neighbor.size()) {
 			unaccessed->push_back(path->back());
 			path->pop_back();
+			pathCnt--;
 		}
 
 		QImage image = paintPath();
+		if(sleepTime != 0)
+		msleep(sleepTime);
+
 		emit imageReady(image);
 	}
 
+	for (auto& item : visited)
+	{
+		if (item == 1)
+		{
+			visitedCnt++;
+		}
+	}
 }
 
 void DrawThread::findPathByBreadthFirstSearch(int start, int end)
@@ -779,23 +874,33 @@ void DrawThread::findPathByBreadthFirstSearch(int start, int end)
 	std::vector<int> visited(row * column, 0);
 	std::vector<int> isUnaccessed(row * column, 0);
 	std::vector<int> parent(row * column, -1);
+	bool isFound = false;
 	path->push_back(std::make_pair(0, 0));
 
 	std::random_device rd;
 	std::mt19937 g(rd());
 
 	while (true) {
+		{
+			QMutexLocker locker(&mutex);
+			if (isPaused)
+			{
+				condition.wait(&mutex);
+			}
+		}
+
 		if (currentVisitPathIndex == path->size()) {
 			break;
 		}
 
 		auto current = path->at(currentVisitPathIndex);
-
+		
 		if (current.second == end) {
 			currentVisitPathIndex++;
+			isFound = true;
 			continue;
 		}
-
+		//visitedCnt++;
 		visited[current.second] = 1;
 		auto neighbor = *maze->getNeighbor(current.second);
 		std::shuffle(neighbor.begin(), neighbor.end(), g);
@@ -806,6 +911,10 @@ void DrawThread::findPathByBreadthFirstSearch(int start, int end)
 				if (isUnaccessed[neighbor[i]] == 0)
 					unaccessedFlag = false;
 				parent[neighbor[i]] = current.second;
+
+				if(isFound == false)
+				visitedCnt++;
+
 				path->push_back(std::make_pair(current.second, neighbor[i]));
 			}
 		}
@@ -816,6 +925,7 @@ void DrawThread::findPathByBreadthFirstSearch(int start, int end)
 			if (parent[index] == end || parent[index] == 0) {
 				break;
 			}
+			//visitedCnt--;
 			unaccessed->push_back(std::make_pair(parent[index], index));
 			isUnaccessed[index] = 1;
 			index = parent[index];
@@ -837,8 +947,19 @@ void DrawThread::findPathByBreadthFirstSearch(int start, int end)
 
 		currentVisitPathIndex++;
 		QImage image = paintPath();
+		if(sleepTime != 0)
+		msleep(sleepTime);
+
 		emit imageReady(image);
 	}
+
+	int index = end;
+	while (index != start)
+	{
+		pathCnt++;
+		index = parent[index];
+	}
+
 }
 
 void DrawThread::findPathByDijkstra(int start, int end)
@@ -847,6 +968,100 @@ void DrawThread::findPathByDijkstra(int start, int end)
 
 void DrawThread::findPathByAStar(int start, int end)
 {
+	path = new std::vector<std::pair<int, int>>();
+	unaccessed = new std::vector<std::pair<int, int>>();
+
+	std::vector<bool> open(row * column, false);
+	std::vector<bool> closed(row * column, false);
+	std::vector<int> parent(row * column, -1);
+	std::vector<int> F(row * column, 0);
+
+	for (int i = 0; i < row; i++) {
+		for (int j = 0; j < column; j++) {
+			F[i * column + j] = (i - row) * (i - row) + (j - column) * (j - column);
+			F[i * column + j] = sqrt(F[i * column + j]) * 2;
+			F[i * column + j] += sqrt(i * i + j * j);
+		}
+
+	}
+	auto compare = [&F](int a, int b) {
+		return F[a] > F[b];
+	};
+	std::priority_queue<int, std::vector<int>, decltype(compare)> openList(compare);
+	openList.push(start);
+
+	while (true)
+	{
+		int current = openList.top();
+		if (current == end) {
+			break;
+		}
+		
+		openList.pop();
+		closed[current] = true;
+		std::vector<int> neighbor = *maze->getNeighbor(current);
+
+		for (auto& i : neighbor)
+		{
+			if (closed[i] == true)
+			{
+				continue;
+			}
+
+			if (open[i] == false)
+			{
+				visitedCnt++;
+				openList.push(i);
+				open[i] = true;
+				parent[i] = current;
+			}
+
+			path->push_back(std::make_pair(current, i));
+			if (F[current]  < F[i])
+			{
+				F[i] = F[current];
+				parent[i] = current;
+				path->push_back(std::make_pair(current, i));
+
+				QImage image = paintPath();
+				if (sleepTime != 0)
+					msleep(sleepTime);
+				emit imageReady(image);
+			}
+		}
+	}
+
+	int index = end;
+	path = new std::vector<std::pair<int, int>>();
+	while (true)
+	{
+		if (index == start) {
+			break;
+		}
+		pathCnt++;
+		path->push_back(std::make_pair(parent[index], index));
+		index = parent[index];
+	}
+
+	QImage image = paintPath();
+	/*if (sleepTime != 0)
+		msleep(sleepTime);*/
+	emit imageReady(image);
+}
+
+void DrawThread::pause()
+{
+	QMutexLocker locker(&mutex);
+	isPaused = true;
+	isDrawing = false;
+}
+
+void DrawThread::resume()
+{
+	QMutexLocker locker(&mutex);
+	isPaused = false;
+	isDrawing = true;
+	condition.wakeAll();
 }
 
 void MainWindow::onMethodChanged(Generate_method method)
@@ -886,4 +1101,12 @@ void MainWindow::findPathButtonClicked()
 	drawThread->row = row_cnt->value();
 	drawThread->column = col_cnt->value();
 	drawThread->start();
+}
+
+void MainWindow::onVisitedCntChanged(int visitedCnt,int pathCnt)
+{
+	label_visited_cnt->setText("Visited Count: \n" + QString::number(visitedCnt));
+	label_visited_cnt->adjustSize();
+	label_path_cnt->setText("Path Count: \n" + QString::number(pathCnt));
+	label_path_cnt->adjustSize();
 }

@@ -24,6 +24,8 @@
 #include <set>
 #include <queue>
 #include <QComboBox>
+#include <QMutex>
+#include <QWaitCondition>
 #include "AdjacencyList.h"
 //#include "ui_QtWidgetsApplication1.h"
 
@@ -132,19 +134,27 @@ public:
 	void findPathByDijkstra(int start, int end);
 	void findPathByAStar(int start, int end);
 
-
+	void pause();
+	void resume();
 
 	void run() override;
 	bool isDrawing = false;
 	bool isGenerated = false;
 	bool isFindingPath = false;
+	bool isPaused = false;
 
 	bool showWall = true;
 	bool showPath = false;
 	bool showSolution = true;
+	bool showAccessed = false;
 	int row;
 	int column;
+	int sleepTime = 0;
+	int visitedCnt = 0;
+	int pathCnt = 0;
 	QImage BaseImage;
+	QMutex mutex;
+	QWaitCondition condition;
 
 	DrawThread(
 		MazeWidget* mazeWidget, 
@@ -155,7 +165,7 @@ public:
 
 signals:
 	void imageReady(const QImage &image);
-
+	void visitedCntChanged(int visitedCnt,int pathCnt);
 
 };
 
@@ -178,7 +188,7 @@ public slots:
 	}
 
 	void onMethodChanged(Generate_method method);
-
+	void onVisitedCntChanged(int visitedCnt,int pathCnt);
 	void onComboboxFindPathMethodChanged(int index);
 	
 private:
@@ -188,8 +198,12 @@ private:
 	QLabel* label_row;
 	QLabel* label_col;
 	QLabel* label_generate_method;
+	QLabel* label_visited_cnt;
+	QLabel* label_path_cnt;
 	QPushButton* button_generate;
 	QPushButton* button_findpath;
+	QPushButton* button_stop;
+	QPushButton* button_continue;
 	QComboBox* combobox_findpath_method;
 	MazeWidget* mazeWidget;
 	ShowInfoWidget* showInfoWidget;
